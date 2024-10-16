@@ -1,12 +1,235 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的博客</title>
+    <title>我的GitHub博客</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        header {
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            padding: 1rem;
+        }
+        main {
+            padding: 2rem;
+            max-width: 800px;
+            margin: auto;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #editor, #login {
+            margin-bottom: 2rem;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        textarea {
+            height: 200px;
+        }
+        button {
+            background-color: #333;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #555;
+        }
+        article {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 1rem;
+        }
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: #333;
+            color: #fff;
+        }
+        #login {
+            text-align: center;
+        }
+        #login-button {
+            font-size: 1.2rem;
+        }
+        .article-content {
+            white-space: pre-wrap;
+        }
+    </style>
 </head>
 <body>
-    <h1>"欢迎来我的blog"</h1>
-    <ul id="posts"></ul>
+    <header>
+        <h1>我的GitHub博客</h1>
+    </header>
+    
+    <main>
+        <div id="login">
+            <h2>登录</h2>
+            <input type="text" id="username" placeholder="用户名">
+            <input type="password" id="password" placeholder="密码">
+            <button id="login-button">登录</button>
+        </div>
+        
+        <div id="editor" style="display: none;">
+            <h2>编辑文章</h2>
+            <input type="text" id="title" placeholder="文章标题">
+            <textarea id="content" placeholder="文章内容（支持Markdown）"></textarea>
+            <button id="save">保存</button>
+        </div>
+        
+        <div id="articles">
+            <h2>已发布文章</h2>
+            <!-- 文章列表将通过JavaScript动态加载 -->
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 我的GitHub博客. 保留所有权利。</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/@octokit/rest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        const clientId = 'YOUR_GITHUB_CLIENT_ID';
+        const redirectUri = 'YOUR_GITHUB_PAGES_URL';
+        const scope = 'repo';
+
+        const titleInput = document.getElementById('title');
+        const contentInput = document.getElementById('content');
+        const saveButton = document.getElementById('save');
+        const loginButton = document.getElementById('login-button');
+        const loginDiv = document.getElementById('login');
+        const editorDiv = document.getElementById('editor');
+        const articlesContainer = document.getElementById('articles');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+
+        let octokit;
+
+        // 简单的身份验证
+        function authenticate(username, password) {
+            // 这里使用硬编码的凭据，仅用于演示。实际应用中应使用更安全的方法。
+            return username === 'admin' && password === 'password';
+        }
+
+        // 检查是否已登录
+        function checkAuth() {
+            const token = localStorage.getItem('github_token');
+            if (token) {
+                octokit = new Octokit({ auth: token });
+                loginDiv.style.display = 'none';
+                editorDiv.style.display = 'block';
+                loadArticles();
+            } else {
+                loginDiv.style.display = 'block';
+                editorDiv.style.display = 'none';
+            }
+        }
+
+        // 登录
+        loginButton.addEventListener('click', () => {
+            const username = usernameInput.value;
+            const password = passwordInput.value;
+            if (authenticate(username, password)) {
+                // 在实际应用中，这里应该进行GitHub OAuth认证
+                const token = 'SIMULATED_TOKEN';
+                localStorage.setItem('github_token', token);
+                checkAuth();
+            } else {
+                alert('用户名或密码错误');
+            }
+        });
+
+        // 保存文章到GitHub
+        saveButton.addEventListener('click', async () => {
+            const title = titleInput.value;
+            const content = contentInput.value;
+
+            if (!title || !content) {
+                alert('请填写标题和内容');
+                return;
+            }
+
+            try {
+                const fileName = `_posts/${new Date().toISOString().split('T')[0]}-${title.replace(/\s+/g, '-')}.md`;
+                const fileContent = `---
+title: ${title}
+date: ${new Date().toISOString()}
+---
+
+${content}`;
+
+                await octokit.repos.createOrUpdateFileContents({
+                    owner: 'YOUR_GITHUB_USERNAME',
+                    repo: 'YOUR_REPO_NAME',
+                    path: fileName,
+                    message: `Add new post: ${title}`,
+                    content: btoa(fileContent),
+                    branch: 'main'
+                });
+
+                alert('文章已保存');
+                titleInput.value = '';
+                contentInput.value = '';
+                loadArticles();
+            } catch (error) {
+                console.error('保存文章时出错:', error);
+                alert('保存文章时出错，请稍后重试');
+            }
+        });
+
+        // 加载文章列表
+        async function loadArticles() {
+            try {
+                const response = await octokit.repos.getContent({
+                    owner: 'YOUR_GITHUB_USERNAME',
+                    repo: 'YOUR_REPO_NAME',
+                    path: '_posts'
+                });
+
+                articlesContainer.innerHTML = '<h2>已发布文章</h2>';
+
+                for (const file of response.data) {
+                    if (file.type === 'file' && file.name.endsWith('.md')) {
+                        const content = await octokit.repos.getContent({
+                            owner: 'YOUR_GITHUB_USERNAME',
+                            repo: 'YOUR_REPO_NAME',
+                            path: file.path
+                        });
+
+                        const decodedContent = atob(content.data.content);
+                        const [, frontMatter, markdown] = decodedContent.split('---');
+                        const title = frontMatter.match(/title:\s*(.*)/)[1];
+                        const date = frontMatter.match(/date:\s*(.*)/)[1];
+
+                        const articleElement = document.createElement('article');
+                        articleElement.innerHTML = `
+                            <h3>${title}</h3>
+                            <div class="article-content">${marked(markdown)}</div>
+                            <small>${new Date(date).toLocaleString()}</small>
+                        `;
+                        articlesContainer.appendChild(articleElement);
+                    }
+                }
+            } catch (error) {
+                console.error('加载文章时出错:', error);
+                alert('加载文章时出错，请稍后重试');
+            }
+        }
+
+        // 初始化
+        checkAuth();
+    </script>
 </body>
 </html>
